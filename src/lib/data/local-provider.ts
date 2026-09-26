@@ -514,4 +514,15 @@ export class LocalProvider implements DataProvider {
       libre_por_dia
     };
   }
+
+  // --- Transacciones Recurrentes ---
+  async getTransaccionesRecurrentes(): Promise<any> { return []; }
+  async crearTransaccionRecurrente(): Promise<any> { throw new Error("Not implemented"); }
+  async actualizarTransaccionRecurrente(): Promise<any> { throw new Error("Not implemented"); }
+  async eliminarTransaccionRecurrente(): Promise<any> { throw new Error("Not implemented"); }
+  async registrarEjecucionRecurrente(): Promise<any> { throw new Error("Not implemented"); }
+
+  // --- Reportes ---
+  async getReporteCategorias(): Promise<any> { return []; }
+  async getReporteEvolucion(): Promise<any> { return []; }
 }
