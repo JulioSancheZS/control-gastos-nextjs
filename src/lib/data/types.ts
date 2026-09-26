@@ -93,6 +93,7 @@ export interface DataProvider {
   crearTransaccionRecurrente(data: Omit<TransaccionRecurrente, "id" | "user_id" | "created_at">): Promise<TransaccionRecurrente>;
   actualizarTransaccionRecurrente(id: string, data: Partial<TransaccionRecurrente>): Promise<TransaccionRecurrente>;
   eliminarTransaccionRecurrente(id: string): Promise<void>;
+  registrarEjecucionRecurrente(id: string, fecha: string): Promise<void>;
 
   // Reportes
   getReporteCategorias(mesesAtras?: number): Promise<ReporteCategoria[]>;

@@ -55,14 +55,18 @@ export function CheckInRecurrentes() {
     
     try {
       const planActivo = await provider.getPlanActivo();
+      let todasAsignaciones: any[] = [];
+      if (planActivo) {
+        todasAsignaciones = await provider.getAsignaciones(planActivo.id);
+      }
       
       for (const r of pendientes) {
         // Buscar si tiene plan activo o asignación en el plan
         let asignacionId = undefined;
         if (planActivo) {
-          const { data: asignaciones } = await provider['supabase'].from('asignaciones').select('id').eq('plan_id', planActivo.id).eq('proposito_id', r.proposito_id).single();
-          if (asignaciones) {
-            asignacionId = asignaciones.id;
+          const asig = todasAsignaciones.find(a => a.proposito_id === r.proposito_id);
+          if (asig) {
+            asignacionId = asig.id;
           }
         }
 
