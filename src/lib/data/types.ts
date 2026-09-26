@@ -5,7 +5,10 @@ import {
   Asignacion,
   Movimiento,
   PerfilUsuario,
-  ResumenKPIs
+  ResumenKPIs,
+  TransaccionRecurrente,
+  ReporteCategoria,
+  ReporteEvolucion
 } from "@/types";
 
 export interface PlanificarDatos {
@@ -32,11 +35,13 @@ export interface DataProvider {
   getCuentas(): Promise<Cuenta[]>;
   crearCuenta(cuenta: Omit<Cuenta, "id" | "user_id" | "created_at">): Promise<Cuenta>;
   getSaldoCuenta(cuentaId: string): Promise<number>;
+  eliminarCuenta(id: string): Promise<void>;
 
   // Propósitos
   getPropositos(): Promise<Proposito[]>;
   crearProposito(proposito: Omit<Proposito, "id" | "user_id" | "created_at">): Promise<Proposito>;
   actualizarProposito(id: string, data: Partial<Proposito>): Promise<Proposito>;
+  eliminarProposito(id: string): Promise<void>;
 
   // Planes Financieros
   getPlanActivo(): Promise<PlanFinanciero | null>;
@@ -82,4 +87,14 @@ export interface DataProvider {
 
   // Resumen / KPIs
   getResumenKPIs(planId: string): Promise<ResumenKPIs>;
+
+  // Transacciones Recurrentes
+  getTransaccionesRecurrentes(): Promise<TransaccionRecurrente[]>;
+  crearTransaccionRecurrente(data: Omit<TransaccionRecurrente, "id" | "user_id" | "created_at">): Promise<TransaccionRecurrente>;
+  actualizarTransaccionRecurrente(id: string, data: Partial<TransaccionRecurrente>): Promise<TransaccionRecurrente>;
+  eliminarTransaccionRecurrente(id: string): Promise<void>;
+
+  // Reportes
+  getReporteCategorias(mesesAtras?: number): Promise<ReporteCategoria[]>;
+  getReporteEvolucion(meses?: number): Promise<ReporteEvolucion[]>;
 }

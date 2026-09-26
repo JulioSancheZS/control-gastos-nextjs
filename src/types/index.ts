@@ -19,7 +19,7 @@ export interface Proposito {
   icono?: string;
   color?: string;
   activa: boolean;
-  patronEsperado?: PatronProposito;
+  patron_esperado?: PatronProposito;
   es_ahorro?: boolean;
   tipo_categoria?: TipoCategoriaProposito;
   created_at: string;
@@ -70,6 +70,8 @@ export type TipoPerfil = "TRACKER" | "PLANIFICADOR" | "AHORRADOR";
 
 export interface PerfilUsuario {
   id: string;
+  email?: string;
+  nombre?: string;
   tipo_perfil: TipoPerfil;
   dia_corte_1?: number;
   dia_corte_2?: number;
@@ -87,4 +89,28 @@ export interface ResumenKPIs {
   dinero_disponible: number;
   dias_restantes: number;
   libre_por_dia: number;
+}
+export interface ReporteCategoria {
+  proposito_id: string;
+  nombre: string;
+  color: string;
+  total: number;
+}
+
+export interface ReporteEvolucion {
+  mes: string;
+  ingresos: number;
+  gastos: number;
+}
+export interface TransaccionRecurrente {
+  id: string;
+  user_id: string;
+  cuenta_id: string;
+  proposito_id: string;
+  monto: number;
+  dia_del_mes: number;
+  descripcion?: string;
+  activa: boolean;
+  ultima_ejecucion?: string;
+  created_at: string;
 }

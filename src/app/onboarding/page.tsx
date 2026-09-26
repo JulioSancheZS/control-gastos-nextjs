@@ -1,16 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useDataProvider } from "@/hooks/use-data-provider";
+import { migrateLocalDataToCloud } from "@/lib/data/migration";
+import { PROPOSITOS_DEFAULT } from "@/lib/data/seed";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TipoPerfil } from "@/types";
+import { CloudUpload, RefreshCw, XCircle } from "lucide-react";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const provider = useDataProvider();
   const [loading, setLoading] = useState(false);
+  
+  // Migration State
+  const [hasLocalData, setHasLocalData] = useState(false);
+  const [showMigration, setShowMigration] = useState(false);
+  const [migrationLog, setMigrationLog] = useState("");
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationDone, setMigrationDone] = useState(false);
+
+  useEffect(() => {
+    const perfil = localStorage.getItem('perfil_usuario');
+    const migracionHecha = localStorage.getItem('control-gastos-migrated');
+    
+    // Si hay un perfil de usuario, significa que realmente usó la app de forma local (pasó el onboarding local).
+    // Evitamos el falso positivo de los "propósitos" que se precargan por defecto en AppProvider.
+    if (perfil && !migracionHecha) {
+      setHasLocalData(true);
+      setShowMigration(true);
+    }
+  }, []);
+
+  const handleMigrate = async () => {
+    setIsMigrating(true);
+    try {
+      const user = await provider.getUser();
+      if (!user) throw new Error("No hay usuario autenticado.");
+      
+      await migrateLocalDataToCloud(user.id, (msg) => {
+        setMigrationLog(prev => prev + msg + "\n");
+      });
+      
+      setMigrationDone(true);
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 2000);
+    } catch (e: any) {
+      setMigrationLog(prev => prev + "\nERROR: " + e.message);
+      console.error(e);
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
+  const handleSkipMigration = () => {
+    localStorage.setItem('control-gastos-migrated', 'true');
+    setShowMigration(false);
+  };
 
   const handleSelectProfile = async (tipo_perfil: TipoPerfil) => {
     setLoading(true);
@@ -34,7 +83,25 @@ export default function OnboardingPage() {
         });
       }
 
-      // 3. Routing basado en perfil
+      // 3. Crear Propósitos por Defecto si no existen
+      if (tipo_perfil === "PLANIFICADOR" || tipo_perfil === "AHORRADOR") {
+        const propositos = await provider.getPropositos();
+        if (propositos.length === 0) {
+          for (const p of PROPOSITOS_DEFAULT) {
+            await provider.crearProposito({
+              nombre: p.nombre,
+              icono: p.icono,
+              color: p.color,
+              patron_esperado: p.patron_esperado,
+              es_ahorro: p.es_ahorro,
+              tipo_categoria: p.tipo_categoria,
+              activa: p.activa
+            });
+          }
+        }
+      }
+
+      // 4. Routing basado en perfil
       if (tipo_perfil === "TRACKER") {
         router.push("/dashboard");
       } else {
@@ -46,6 +113,59 @@ export default function OnboardingPage() {
       setLoading(false);
     }
   };
+
+  if (showMigration) {
+    return (
+      <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-background text-foreground relative overflow-hidden">
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-[120px] pointer-events-none" />
+
+        <div className="max-w-md w-full bg-card/40 backdrop-blur-xl border border-border/50 rounded-3xl p-8 shadow-2xl z-10 animate-in fade-in zoom-in duration-500">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="h-16 w-16 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center">
+              <CloudUpload className="h-8 w-8" />
+            </div>
+            <h2 className="text-2xl font-bold">¡Datos locales detectados!</h2>
+            <p className="text-muted-foreground text-sm">
+              Hemos encontrado cuentas y movimientos en tu dispositivo creados en el modo de prueba. 
+              ¿Deseas sincronizarlos con tu nueva cuenta en la nube para no perderlos?
+            </p>
+
+            {migrationLog && (
+              <div className="w-full mt-4 p-3 bg-black/50 rounded-lg text-left overflow-y-auto max-h-32">
+                <pre className="text-xs text-blue-300 font-mono whitespace-pre-wrap">{migrationLog}</pre>
+              </div>
+            )}
+
+            {!migrationDone ? (
+              <div className="w-full flex flex-col gap-3 pt-4">
+                <Button 
+                  onClick={handleMigrate} 
+                  disabled={isMigrating}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isMigrating ? <RefreshCw className="h-5 w-5 animate-spin mr-2" /> : <CloudUpload className="h-5 w-5 mr-2" />}
+                  {isMigrating ? "Migrando datos..." : "Sí, sincronizar datos"}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={handleSkipMigration}
+                  disabled={isMigrating}
+                  className="w-full text-muted-foreground hover:text-white"
+                >
+                  No, empezar desde cero
+                </Button>
+              </div>
+            ) : (
+              <div className="w-full pt-4">
+                <p className="text-emerald-400 font-medium pb-4">¡Migración exitosa!</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-background text-foreground">

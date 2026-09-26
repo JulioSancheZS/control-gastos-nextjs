@@ -11,7 +11,20 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { Plus, ArrowDownCircle, ArrowUpCircle, Wallet, ArrowLeftRight } from "lucide-react";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { DatePicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/utils";
+
+const movimientoSchema = z.object({
+  tipoMovimiento: z.enum(["INGRESO", "GASTO", "AHORRO"]),
+  descripcion: z.string().min(2, "La descripción es muy corta"),
+  monto: z.coerce.number().min(0.01, "El monto debe ser mayor a 0"),
+  fechaMovimiento: z.date(),
+  cuentaId: z.string().min(1, "Selecciona una cuenta"),
+});
 
 export function TrackerDashboard() {
   const provider = useDataProvider();
@@ -24,16 +37,26 @@ export function TrackerDashboard() {
   const [totalIngresos, setTotalIngresos] = useState(0);
   const [totalGastos, setTotalGastos] = useState(0);
   const [balanceNeto, setBalanceNeto] = useState(0);
+  const [isLocalUser, setIsLocalUser] = useState(false);
 
-  // Form states
   const [openModal, setOpenModal] = useState(false);
-  const [tipoMovimiento, setTipoMovimiento] = useState<"INGRESO" | "GASTO" | "AHORRO">("GASTO");
-  const [monto, setMonto] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [fechaMovimiento, setFechaMovimiento] = useState(new Date().toISOString().split("T")[0]);
-  const [cuentaId, setCuentaId] = useState("");
+
+  const form = useForm<any>({
+    resolver: zodResolver(movimientoSchema),
+    defaultValues: {
+      tipoMovimiento: "GASTO",
+      descripcion: "",
+      monto: 0,
+      fechaMovimiento: new Date(),
+      cuentaId: "",
+    },
+  });
 
   const loadData = async () => {
+    // Check local user for banner rendering
+    const u = await provider.getUser();
+    setIsLocalUser(u?.id === "local-user");
+
     // In Tracker mode, we get ALL movements for the current month
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth();
@@ -63,7 +86,9 @@ export function TrackerDashboard() {
 
     const accounts = await provider.getCuentas();
     setCuentas(accounts);
-    if (accounts.length > 0 && !cuentaId) setCuentaId(accounts[0].id);
+    if (accounts.length > 0 && !form.getValues("cuentaId")) {
+      form.setValue("cuentaId", accounts[0].id);
+    }
   };
 
   useEffect(() => {
@@ -71,36 +96,29 @@ export function TrackerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider]);
 
-  const handleGuardarMovimiento = async () => {
-    if (!monto || parseFloat(monto) <= 0 || !descripcion || !cuentaId) {
-      alert("Por favor completa los campos requeridos.");
-      return;
-    }
-
+  const onSubmitMovimiento = async (values: z.infer<typeof movimientoSchema>) => {
     try {
-      if (tipoMovimiento === "INGRESO") {
+      const fechaStr = values.fechaMovimiento.toISOString().split("T")[0];
+      if (values.tipoMovimiento === "INGRESO") {
         await provider.registrarIngreso({
-          cuenta_id: cuentaId,
-          monto: parseFloat(monto),
-          descripcion,
-          fecha: fechaMovimiento,
-          fuente: descripcion,
+          cuenta_id: values.cuentaId,
+          monto: values.monto,
+          descripcion: values.descripcion,
+          fecha: fechaStr,
+          fuente: values.descripcion,
         });
       } else {
-        // GASTO o AHORRO
         await provider.registrarGasto({
-          cuenta_id: cuentaId,
-          monto: parseFloat(monto),
-          descripcion,
-          fecha: fechaMovimiento,
-          proposito_id: tipoMovimiento === "AHORRO" ? "AHORRO_TRACKER" : undefined,
+          cuenta_id: values.cuentaId,
+          monto: values.monto,
+          descripcion: values.descripcion,
+          fecha: fechaStr,
+          proposito_id: values.tipoMovimiento === "AHORRO" ? "AHORRO_TRACKER" : undefined,
         });
       }
       
       setOpenModal(false);
-      setMonto("");
-      setDescripcion("");
-      setTipoMovimiento("GASTO");
+      form.reset();
       loadData();
     } catch (e) {
       console.error(e);
@@ -134,6 +152,23 @@ export function TrackerDashboard() {
     <MainLayout>
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
         
+        {/* Lead Magnet Banner (Tracker Local) */}
+        {isLocalUser && (
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 border border-white/10 rounded-3xl p-5 md:p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-indigo-500/20">
+            <div className="flex-1">
+              <h3 className="text-lg font-bold flex items-center gap-2 text-white">
+                <span className="text-indigo-200">✨</span> Sube de nivel tus finanzas
+              </h3>
+              <p className="text-blue-100/90 text-sm mt-1 leading-relaxed">
+                Actualmente estás en el modo de demostración. <strong>Crea una cuenta gratuita</strong> para respaldar tu información en la nube y desbloquear el poderoso <strong>Planificador Financiero</strong>.
+              </p>
+            </div>
+            <Button onClick={() => window.location.href = '/auth/registro'} className="whitespace-nowrap h-12 px-6 bg-white hover:bg-gray-100 text-indigo-600 font-bold rounded-xl shadow-lg hover:shadow-xl transition-all w-full md:w-auto">
+              Crear Cuenta Gratis
+            </Button>
+          </div>
+        )}
+
         {/* Encabezado y Acción Principal */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -159,113 +194,162 @@ export function TrackerDashboard() {
                 Agrega un ingreso, gasto o ahorro a tu presupuesto.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              
-              <div className="grid grid-cols-3 gap-2 p-1 bg-muted/30 rounded-lg">
-                <button
-                  onClick={() => setTipoMovimiento("INGRESO")}
-                  className={cn(
-                    "px-4 py-2 rounded-md text-sm font-medium transition-all",
-                    tipoMovimiento === "INGRESO" ? "bg-emerald-500 text-white shadow-sm" : "text-muted-foreground hover:bg-muted/50"
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmitMovimiento)} className="space-y-4 py-4">
+                
+                <FormField
+                  control={form.control}
+                  name="tipoMovimiento"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="grid grid-cols-3 gap-2 p-1 bg-muted/30 rounded-lg">
+                          <button
+                            type="button"
+                            onClick={() => field.onChange("INGRESO")}
+                            className={cn(
+                              "px-4 py-2 rounded-md text-sm font-medium transition-all",
+                              field.value === "INGRESO" ? "bg-emerald-500 text-white shadow-sm" : "text-muted-foreground hover:bg-muted/50"
+                            )}
+                          >
+                            Ingreso
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => field.onChange("GASTO")}
+                            className={cn(
+                              "px-4 py-2 rounded-md text-sm font-medium transition-all",
+                              field.value === "GASTO" ? "bg-rose-500 text-white shadow-sm" : "text-muted-foreground hover:bg-muted/50"
+                            )}
+                          >
+                            Gasto
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => field.onChange("AHORRO")}
+                            className={cn(
+                              "px-4 py-2 rounded-md text-sm font-medium transition-all",
+                              field.value === "AHORRO" ? "bg-yellow-500 text-white shadow-sm" : "text-muted-foreground hover:bg-muted/50"
+                            )}
+                          >
+                            Ahorro
+                          </button>
+                        </div>
+                      </FormControl>
+                    </FormItem>
                   )}
-                >
-                  Ingreso
-                </button>
-                <button
-                  onClick={() => setTipoMovimiento("GASTO")}
-                  className={cn(
-                    "px-4 py-2 rounded-md text-sm font-medium transition-all",
-                    tipoMovimiento === "GASTO" ? "bg-rose-500 text-white shadow-sm" : "text-muted-foreground hover:bg-muted/50"
-                  )}
-                >
-                  Gasto
-                </button>
-                <button
-                  onClick={() => setTipoMovimiento("AHORRO")}
-                  className={cn(
-                    "px-4 py-2 rounded-md text-sm font-medium transition-all",
-                    tipoMovimiento === "AHORRO" ? "bg-yellow-500 text-white shadow-sm" : "text-muted-foreground hover:bg-muted/50"
-                  )}
-                >
-                  Ahorro
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Nombre del Movimiento</label>
-                <input
-                  type="text"
-                  placeholder="Ej: Salario, Alquiler, Servicios"
-                  value={descripcion}
-                  onChange={(e) => setDescripcion(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-border/60 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Monto (C$)</label>
-                  <input
-                    type="number"
-                    placeholder="0.00"
-                    value={monto}
-                    onChange={(e) => setMonto(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-border/60 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                <FormField
+                  control={form.control}
+                  name="descripcion"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre del Movimiento</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Ej: Salario, Alquiler, Servicios"
+                          className="bg-background border-border/60"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="monto"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Monto (C$)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            className="bg-background border-border/60"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="fechaMovimiento"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Fecha Movimiento</FormLabel>
+                        <FormControl>
+                          <DatePicker
+                            value={field.value}
+                            onChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Fecha Movimiento</label>
-                  <input
-                    type="date"
-                    value={fechaMovimiento}
-                    onChange={(e) => setFechaMovimiento(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-border/60 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-              </div>
 
-              {cuentas.length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Cuenta</label>
-                  <select
-                    value={cuentaId}
-                    onChange={(e) => setCuentaId(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-border/60 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  >
-                    {cuentas.map(c => (
-                      <option key={c.id} value={c.id}>{c.nombre} (C$ {c.saldo_inicial})</option>
-                    ))}
+                {cuentas.length > 0 && (
+                  <FormField
+                    control={form.control}
+                    name="cuentaId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cuenta</FormLabel>
+                        <FormControl>
+                          <select
+                            value={field.value}
+                            onChange={field.onChange}
+                            className="w-full h-10 px-3 bg-background border border-border/60 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                          >
+                            <option value="">Selecciona una cuenta</option>
+                            {cuentas.map(c => (
+                              <option key={c.id} value={c.id}>{c.nombre} (C$ {c.saldo_inicial})</option>
+                            ))}
+                          </select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                <div className="space-y-2 opacity-50 cursor-not-allowed">
+                  <Label>Frecuencia</Label>
+                  <select disabled className="w-full px-3 py-2 bg-background border border-border/60 rounded-md text-sm">
+                    <option>Único (No recurrente)</option>
+                    <option>Semanal</option>
+                    <option>Quincenal</option>
+                    <option>Mensual</option>
                   </select>
+                  <p className="text-xs text-muted-foreground mt-1">La recurrencia estará disponible pronto.</p>
                 </div>
-              )}
 
-              {/* Frecuencia (Solo visual según recomendación de Blazor) */}
-              <div className="space-y-2 opacity-50 cursor-not-allowed">
-                <label className="text-sm font-medium">Frecuencia</label>
-                <select disabled className="w-full px-3 py-2 bg-background border border-border/60 rounded-md">
-                  <option>Único (No recurrente)</option>
-                  <option>Semanal</option>
-                  <option>Quincenal</option>
-                  <option>Mensual</option>
-                </select>
-                <p className="text-xs text-muted-foreground mt-1">La recurrencia estará disponible pronto.</p>
-              </div>
-
-            </div>
-            <DialogFooter>
-              <button 
-                onClick={() => setOpenModal(false)}
-                className="px-4 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-muted/50 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleGuardarMovimiento}
-                className="px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90 transition-colors"
-              >
-                Agregar Movimiento
-              </button>
-            </DialogFooter>
+                <DialogFooter className="mt-6">
+                  <Button 
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setOpenModal(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-primary text-primary-foreground shadow hover:bg-primary/90"
+                  >
+                    Agregar Movimiento
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
           </DialogContent>
           </Dialog>
         </div>

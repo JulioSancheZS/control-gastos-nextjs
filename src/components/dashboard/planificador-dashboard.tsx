@@ -21,9 +21,23 @@ import {
   CircleDollarSign,
   BarChart3,
   Info,
-  CreditCard
+  CreditCard,
+  Loader2
 } from "lucide-react";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { DatePicker } from "@/components/ui/date-picker";
 import { useDataProvider } from "@/hooks/use-data-provider";
+
+const gastoSchema = z.object({
+  asignacionId: z.string(),
+  monto: z.coerce.number().min(0.01, "El monto debe ser mayor a 0"),
+  fechaGasto: z.date(),
+  cuentaId: z.string().min(1, "Selecciona una cuenta"),
+  descripcion: z.string().optional(),
+});
 import { MainLayout } from "@/components/shared/main-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -66,14 +80,23 @@ export function PlanificadorDashboard() {
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isLocalUser, setIsLocalUser] = useState(false);
+  
+  const [payingId, setPayingId] = useState<string | null>(null);
 
   // Modal de gasto
   const [openGasto, setOpenGasto] = useState(false);
-  const [monto, setMonto] = useState("");
-  const [asignacionId, setAsignacionId] = useState("LIBRE");
-  const [cuentaId, setCuentaId] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [fechaGasto, setFechaGasto] = useState(() => new Date().toISOString().split("T")[0]);
+
+  const form = useForm<any>({
+    resolver: zodResolver(gastoSchema),
+    defaultValues: {
+      asignacionId: "LIBRE",
+      monto: 0,
+      fechaGasto: new Date(),
+      cuentaId: "",
+      descripcion: "",
+    },
+  });
 
   useEffect(() => {
     async function load() {
@@ -84,10 +107,15 @@ export function PlanificadorDashboard() {
           return;
         }
         setPlanActivo(activo);
+        
+        const currentUser = await provider.getUser();
+        setIsLocalUser(currentUser?.id === "local-user");
 
         const dataCuentas = await provider.getCuentas();
         setCuentas(dataCuentas);
-        if (dataCuentas.length > 0 && !cuentaId) setCuentaId(dataCuentas[0].id);
+        if (dataCuentas.length > 0 && !form.getValues("cuentaId")) {
+          form.setValue("cuentaId", dataCuentas[0].id);
+        }
 
         const dataKPIs = await provider.getResumenKPIs(activo.id);
         setKpis(dataKPIs);
@@ -116,6 +144,7 @@ export function PlanificadorDashboard() {
         console.error("Error cargando dashboard", e);
       } finally {
         setLoading(false);
+        setPayingId(null);
       }
     }
     load();
@@ -135,26 +164,27 @@ export function PlanificadorDashboard() {
     return <CircleDollarSign className="h-4.5 w-4.5" />;
   };
 
-  const handleRegistrarGasto = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!monto || Number(monto) <= 0 || !planActivo || !cuentaId) return;
+  const onSubmitGasto = async (values: z.infer<typeof gastoSchema>) => {
+    if (!planActivo) return;
 
     try {
-      const isLibre = asignacionId === "LIBRE";
-      const asig = isLibre ? null : asignacionesPendientes.find(a => a.id === asignacionId);
+      const isLibre = values.asignacionId === "LIBRE";
+      const asig = isLibre ? null : asignacionesPendientes.find(a => a.id === values.asignacionId);
       
+      const fechaStr = values.fechaGasto.toISOString().split("T")[0];
+
       await provider.registrarGasto({
-        cuenta_id: cuentaId,
-        monto: Number(monto),
-        fecha: fechaGasto,
-        descripcion: descripcion || undefined,
+        cuenta_id: values.cuentaId,
+        monto: values.monto,
+        fecha: fechaStr,
+        descripcion: values.descripcion || undefined,
         asignacion_id: asig?.id,
         proposito_id: asig?.proposito_id,
         plan_id: planActivo.id
       });
-      setMonto("");
-      setDescripcion("");
-      setAsignacionId("LIBRE");
+      
+      form.reset();
+      form.setValue("cuentaId", cuentas.length > 0 ? cuentas[0].id : "");
       setOpenGasto(false);
       setRefreshTrigger(prev => prev + 1);
     } catch (e) {
@@ -165,10 +195,11 @@ export function PlanificadorDashboard() {
 
 
   const handlePagarRapido = async (asig: AsignacionPendiente) => {
-    if (!planActivo || !cuentaId || asig.disponible <= 0) return;
+    if (!planActivo || asig.disponible <= 0) return;
+    setPayingId(asig.id);
     try {
       await provider.registrarGasto({
-        cuenta_id: cuentaId,
+        cuenta_id: form.getValues("cuentaId") || cuentas[0]?.id,
         monto: asig.disponible,
         fecha: new Date().toISOString().split("T")[0],
         descripcion: `Pago de ${asig.proposito.nombre}`,
@@ -179,6 +210,7 @@ export function PlanificadorDashboard() {
       setRefreshTrigger(prev => prev + 1);
     } catch (e) {
       console.error(e);
+      setPayingId(null); // Solo limpiar si falla, si triunfa se limpia en load()
     }
   };
 
@@ -208,12 +240,33 @@ export function PlanificadorDashboard() {
   const hoyStr = new Date().toISOString().split("T")[0];
   const esPlanVencido = planActivo.fecha_fin ? planActivo.fecha_fin < hoyStr : false;
 
-  const sobresCompromisos = asignacionesPendientes.filter(a => a.proposito.tipo_categoria === "COMPROMISO" || (!a.proposito.tipo_categoria && !a.proposito.es_ahorro && a.proposito.patronEsperado === "FIJO"));
-  const sobresFondosConsumo = asignacionesPendientes.filter(a => a.proposito.tipo_categoria === "FONDO_CONSUMO" || (!a.proposito.tipo_categoria && !a.proposito.es_ahorro && a.proposito.patronEsperado !== "FIJO"));
+  const sobresCompromisos = asignacionesPendientes.filter(a => a.proposito.tipo_categoria === "COMPROMISO" || (!a.proposito.tipo_categoria && !a.proposito.es_ahorro && a.proposito.patron_esperado === "FIJO"));
+  const sobresFondosConsumo = asignacionesPendientes.filter(a => a.proposito.tipo_categoria === "FONDO_CONSUMO" || (!a.proposito.tipo_categoria && !a.proposito.es_ahorro && a.proposito.patron_esperado !== "FIJO"));
   const sobresAhorro = asignacionesPendientes.filter(a => a.proposito.tipo_categoria === "AHORRO" || (!a.proposito.tipo_categoria && a.proposito.es_ahorro));
 
   return (
     <MainLayout>
+      {isLocalUser && (
+        <div className="mb-6 p-5 rounded-3xl border border-white/10 bg-gradient-to-r from-blue-600 to-indigo-600 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-indigo-500/20 animate-in fade-in slide-in-from-top-3 duration-300">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-white/20 text-white flex items-center justify-center shrink-0 backdrop-blur-md">
+              <Sparkles className="h-7 w-7" />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-white tracking-wide">Modo de Prueba Activo</h4>
+              <p className="text-sm text-blue-100/90 mt-1 max-w-xl leading-relaxed">
+                Estás probando el Planificador Avanzado en tu dispositivo. Crea tu cuenta gratis para desbloquear acceso en la nube y asegurar tus planes de forma permanente.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={() => window.location.href = '/auth/registro'}
+            className="w-full md:w-auto h-12 px-6 rounded-xl font-bold bg-white text-indigo-600 hover:bg-gray-100 shrink-0 gap-2 shadow-lg hover:shadow-xl transition-all"
+          >
+            Crear Cuenta Gratis
+          </Button>
+        </div>
+      )}
       {/* Banner de Quincena/Plan Vencido */}
       {esPlanVencido && (
         <div className="mb-6 p-4 rounded-2xl border border-amber-500/40 bg-amber-500/10 flex flex-col md:flex-row items-center justify-between gap-4 text-amber-200 animate-in fade-in slide-in-from-top-3 duration-300">
@@ -405,123 +458,165 @@ export function PlanificadorDashboard() {
                         Elige de dónde saldrá el dinero.
                       </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={handleRegistrarGasto} className="space-y-4 pt-2">
-                      <div className="space-y-1">
-                        <Label>¿De qué asignación/propósito sale?</Label>
-                        <select
-                          value={asignacionId}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setAsignacionId(val);
-                            if (val !== "LIBRE") {
-                              const asig = asignacionesPendientes.find(a => a.id === val);
-                              if (asig && (asig.proposito.tipo_categoria === 'COMPROMISO' || (!asig.proposito.tipo_categoria && !asig.proposito.es_ahorro && asig.proposito.patronEsperado === 'FIJO'))) {
-                                // Solo autocompletar si el usuario no ha escrito nada
-                                if (!monto) {
-                                  setMonto(asig.disponible.toString());
-                                }
-                              } else if (!monto) {
-                                setMonto("");
-                              }
-                            }
-                          }}
-                          className="w-full h-10 px-3 rounded-xl border border-border/60 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 font-semibold"
-                        >
-                          <option value="LIBRE" className="text-emerald-500 font-bold">Libre (Restar del Disponible Global)</option>
-                          
-                          {sobresCompromisos.length > 0 && (
-                            <optgroup label="📌 Compromisos Obligatorios">
-                              {sobresCompromisos.map((a) => {
-                                const isCero = a.disponible <= 0;
-                                return (
-                                  <option key={a.id} value={a.id} disabled={isCero}>
-                                    {a.proposito.nombre} (Disp: C$ {a.disponible}){isCero ? " - Agotado" : ""}
-                                  </option>
-                                );
-                              })}
-                            </optgroup>
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmitGasto)} className="space-y-4 pt-2">
+                        
+                        <FormField
+                          control={form.control}
+                          name="asignacionId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>¿De qué asignación/propósito sale?</FormLabel>
+                              <FormControl>
+                                <select
+                                  value={field.value}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    field.onChange(val);
+                                    if (val !== "LIBRE") {
+                                      const asig = asignacionesPendientes.find(a => a.id === val);
+                                      if (asig && (asig.proposito.tipo_categoria === 'COMPROMISO' || (!asig.proposito.tipo_categoria && !asig.proposito.es_ahorro && asig.proposito.patron_esperado === 'FIJO'))) {
+                                        if (!form.getValues("monto")) {
+                                          form.setValue("monto", asig.disponible);
+                                        }
+                                      } else if (!form.getValues("monto")) {
+                                        form.setValue("monto", 0);
+                                      }
+                                    }
+                                  }}
+                                  className="w-full h-10 px-3 rounded-xl border border-border/60 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 font-semibold"
+                                >
+                                  <option value="LIBRE" className="text-emerald-500 font-bold">Libre (Restar del Disponible Global)</option>
+                                  
+                                  {sobresCompromisos.length > 0 && (
+                                    <optgroup label="📌 Compromisos Obligatorios">
+                                      {sobresCompromisos.map((a) => {
+                                        const isCero = a.disponible <= 0;
+                                        return (
+                                          <option key={a.id} value={a.id} disabled={isCero}>
+                                            {a.proposito.nombre} (Disp: C$ {a.disponible}){isCero ? " - Agotado" : ""}
+                                          </option>
+                                        );
+                                      })}
+                                    </optgroup>
+                                  )}
+
+                                  {sobresFondosConsumo.length > 0 && (
+                                    <optgroup label="⛽ Fondos de Consumo Diario">
+                                      {sobresFondosConsumo.map((a) => {
+                                        const isCero = a.disponible <= 0;
+                                        return (
+                                          <option key={a.id} value={a.id} disabled={isCero}>
+                                            {a.proposito.nombre} (Disp: C$ {a.disponible}){isCero ? " - Agotado" : ""}
+                                          </option>
+                                        );
+                                      })}
+                                    </optgroup>
+                                  )}
+
+                                  {sobresAhorro.length > 0 && (
+                                    <optgroup label="🏦 Mis Ahorros y Reservas">
+                                      {sobresAhorro.map((a) => {
+                                        const isCero = a.disponible <= 0;
+                                        return (
+                                          <option key={a.id} value={a.id} disabled={isCero}>
+                                            {a.proposito.nombre} (Disp: C$ {a.disponible}){isCero ? " - Agotado" : ""}
+                                          </option>
+                                        );
+                                      })}
+                                    </optgroup>
+                                  )}
+                                </select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
                           )}
+                        />
 
-                          {sobresFondosConsumo.length > 0 && (
-                            <optgroup label="⛽ Fondos de Consumo Diario">
-                              {sobresFondosConsumo.map((a) => {
-                                const isCero = a.disponible <= 0;
-                                return (
-                                  <option key={a.id} value={a.id} disabled={isCero}>
-                                    {a.proposito.nombre} (Disp: C$ {a.disponible}){isCero ? " - Agotado" : ""}
-                                  </option>
-                                );
-                              })}
-                            </optgroup>
+                        <FormField
+                          control={form.control}
+                          name="monto"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Monto (C$)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  className="h-10 rounded-xl bg-background border-border/60"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
                           )}
+                        />
 
-                          {sobresAhorro.length > 0 && (
-                            <optgroup label="🏦 Mis Ahorros y Reservas">
-                              {sobresAhorro.map((a) => {
-                                const isCero = a.disponible <= 0;
-                                return (
-                                  <option key={a.id} value={a.id} disabled={isCero}>
-                                    {a.proposito.nombre} (Disp: C$ {a.disponible}){isCero ? " - Agotado" : ""}
-                                  </option>
-                                );
-                              })}
-                            </optgroup>
+                        <FormField
+                          control={form.control}
+                          name="fechaGasto"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Fecha del Movimiento</FormLabel>
+                              <FormControl>
+                                <DatePicker
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
                           )}
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label>Monto (C$)</Label>
-                        <Input
-                          type="number"
-                          placeholder="0.00"
-                          required
-                          value={monto}
-                          onChange={(e) => setMonto(e.target.value)}
-                          className="h-10 rounded-xl"
                         />
-                      </div>
 
-                      <div className="space-y-1">
-                        <Label>Fecha del Movimiento</Label>
-                        <Input
-                          type="date"
-                          required
-                          value={fechaGasto}
-                          onChange={(e) => setFechaGasto(e.target.value)}
-                          className="h-10 rounded-xl"
+                        <FormField
+                          control={form.control}
+                          name="cuentaId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>¿De qué cuenta se pagó?</FormLabel>
+                              <FormControl>
+                                <select
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                  className="w-full h-10 px-3 rounded-xl border border-border/60 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500"
+                                >
+                                  {cuentas.map((c) => (
+                                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                                  ))}
+                                </select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </div>
 
-                      <div className="space-y-1">
-                        <Label>¿De qué cuenta se pagó?</Label>
-                        <select
-                          value={cuentaId}
-                          onChange={(e) => setCuentaId(e.target.value)}
-                          className="w-full h-10 px-3 rounded-xl border border-border/60 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500"
-                        >
-                          {cuentas.map((c) => (
-                            <option key={c.id} value={c.id}>{c.nombre}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label>Descripción (Opcional)</Label>
-                        <Input
-                          placeholder="Ej. Almuerzo, supermercado"
-                          value={descripcion}
-                          onChange={(e) => setDescripcion(e.target.value)}
-                          className="h-10 rounded-xl"
+                        <FormField
+                          control={form.control}
+                          name="descripcion"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Descripción (Opcional)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="Ej. Almuerzo, supermercado"
+                                  className="h-10 rounded-xl bg-background border-border/60"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </div>
-                      
-                      <DialogFooter className="pt-2">
-                        <Button type="submit" className="w-full h-10 rounded-xl font-bold bg-amber-500 text-white hover:bg-amber-600">
-                          Guardar Gasto
-                        </Button>
-                      </DialogFooter>
-                    </form>
+                        
+                        <DialogFooter className="pt-2">
+                          <Button type="submit" className="w-full h-10 rounded-xl font-bold bg-amber-500 text-white hover:bg-amber-600">
+                            Guardar Gasto
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </Form>
                   </DialogContent>
                 </Dialog>
 
@@ -657,10 +752,11 @@ export function PlanificadorDashboard() {
                 size="icon"
                 variant="outline"
                 onClick={() => handlePagarRapido(asig)}
+                disabled={payingId === asig.id}
                 className="h-7 w-7 rounded-lg border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-200"
                 title="Pagar todo lo disponible"
               >
-                <Check className="h-3.5 w-3.5" />
+                {payingId === asig.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
               </Button>
             )}
           </div>

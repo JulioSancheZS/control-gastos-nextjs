@@ -43,7 +43,7 @@ export const PROPOSITOS_DEFAULT: Proposito[] = [
     nombre: "Ahorro USD",
     icono: "TrendingUp",
     color: "#8b5cf6",
-    patronEsperado: "FIJO",
+    patron_esperado: "FIJO",
     es_ahorro: true,
     tipo_categoria: "AHORRO",
     activa: true,
@@ -55,7 +55,7 @@ export const PROPOSITOS_DEFAULT: Proposito[] = [
     nombre: "Fondo Misceláneo",
     icono: "Sparkles",
     color: "#a78bfa",
-    patronEsperado: "FIJO",
+    patron_esperado: "FIJO",
     tipo_categoria: "FONDO_CONSUMO",
     activa: true,
     created_at: new Date().toISOString(),
@@ -66,7 +66,7 @@ export const PROPOSITOS_DEFAULT: Proposito[] = [
     nombre: "Fondo Teléfono",
     icono: "Smartphone",
     color: "#3b82f6",
-    patronEsperado: "FIJO",
+    patron_esperado: "FIJO",
     tipo_categoria: "COMPROMISO",
     activa: true,
     created_at: new Date().toISOString(),
@@ -77,7 +77,7 @@ export const PROPOSITOS_DEFAULT: Proposito[] = [
     nombre: "Fondo Internet",
     icono: "Globe",
     color: "#2563eb",
-    patronEsperado: "FIJO",
+    patron_esperado: "FIJO",
     tipo_categoria: "COMPROMISO",
     activa: true,
     created_at: new Date().toISOString(),
@@ -88,7 +88,7 @@ export const PROPOSITOS_DEFAULT: Proposito[] = [
     nombre: "Datos Móviles",
     icono: "Wifi",
     color: "#60a5fa",
-    patronEsperado: "FIJO",
+    patron_esperado: "FIJO",
     tipo_categoria: "FONDO_CONSUMO",
     activa: true,
     created_at: new Date().toISOString(),
@@ -99,7 +99,7 @@ export const PROPOSITOS_DEFAULT: Proposito[] = [
     nombre: "Carro",
     icono: "Car",
     color: "#f59e0b",
-    patronEsperado: "FIJO",
+    patron_esperado: "FIJO",
     tipo_categoria: "COMPROMISO",
     activa: true,
     created_at: new Date().toISOString(),
@@ -110,7 +110,7 @@ export const PROPOSITOS_DEFAULT: Proposito[] = [
     nombre: "Gasolina",
     icono: "Fuel",
     color: "#d97706",
-    patronEsperado: "VARIABLE",
+    patron_esperado: "VARIABLE",
     tipo_categoria: "FONDO_CONSUMO",
     activa: true,
     created_at: new Date().toISOString(),
@@ -121,7 +121,7 @@ export const PROPOSITOS_DEFAULT: Proposito[] = [
     nombre: "Comida",
     icono: "Utensils",
     color: "#f97316",
-    patronEsperado: "VARIABLE",
+    patron_esperado: "VARIABLE",
     tipo_categoria: "FONDO_CONSUMO",
     activa: true,
     created_at: new Date().toISOString(),
@@ -204,10 +204,13 @@ export const MOVIMIENTOS_INICIALES: Movimiento[] = [
 export function inicializarDatos(): void {
   if (typeof window === "undefined") return;
 
-  // We only initialize Propositos if they don't exist, so they are available for Onboarding.
+  // We no longer initialize Propositos automatically here.
+  // This will be done dynamically during Onboarding when the user selects a profile.
+  /*
   if (!localStorage.getItem("propositos")) {
     localStorage.setItem("propositos", JSON.stringify(PROPOSITOS_DEFAULT));
   }
+  */
 
   /* 
   // Disable automatic seeding of profile and plans to test Onboarding

@@ -20,8 +20,9 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         const perfil = await provider.getPerfil();
         
         // Regla 1: Sin perfil
+        const isAuthRoute = pathname.startsWith("/auth/");
         if (!perfil) {
-          if (pathname !== "/onboarding" && pathname !== "/") {
+          if (pathname !== "/onboarding" && pathname !== "/" && !isAuthRoute) {
             router.replace("/onboarding");
             return;
           }
@@ -63,7 +64,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
   // Bloqueamos el renderizado si la ruta actual no ha sido verificada.
   // Excepto si es la ruta de inicio o onboarding, que son públicas y queremos que carguen rápido.
-  if (verifiedPathname !== pathname && pathname !== "/onboarding" && pathname !== "/") {
+  if (verifiedPathname !== pathname && pathname !== "/onboarding" && pathname !== "/" && !pathname.startsWith("/auth/")) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center">
         <div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin mb-4"></div>

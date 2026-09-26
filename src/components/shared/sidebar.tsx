@@ -9,7 +9,8 @@ import {
   TrendingUp, 
   LogOut, 
   Settings,
-  PiggyBank
+  PiggyBank,
+  PieChart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -25,11 +26,15 @@ export function Sidebar({ className, onItemClick }: SidebarProps) {
   const pathname = usePathname();
   const provider = useDataProvider();
   const [perfil, setPerfil] = useState<PerfilUsuario | null>(null);
+  const [user, setUser] = useState<{id: string} | null>(null);
 
   useEffect(() => {
     async function load() {
       const p = await provider.getPerfil();
       if (p) setPerfil(p);
+      
+      const u = await provider.getUser();
+      if (u) setUser(u);
     }
     load();
   }, [provider]);
@@ -56,6 +61,16 @@ export function Sidebar({ className, onItemClick }: SidebarProps) {
       icon: TrendingUp,
     },
     {
+      nombre: "Reportes",
+      href: "/reportes",
+      icon: PieChart, 
+    },
+    {
+      nombre: "Mis Ahorros",
+      href: "/ahorros",
+      icon: PiggyBank,
+    },
+    {
       nombre: "Configuración",
       href: "/configuracion",
       icon: Settings,
@@ -66,13 +81,15 @@ export function Sidebar({ className, onItemClick }: SidebarProps) {
     menuItems = menuItems.filter(item => item.nombre !== "Nuevo Plan" && item.nombre !== "Historial");
   }
 
+  const isLocal = user?.id === "local-user";
+
   return (
     <div className={cn("flex flex-col h-full bg-card/60 backdrop-blur-md border-r border-border/40 text-card-foreground premium-card-glow", className)}>
       {/* Brand Logo Header */}
-      <div className="flex items-center gap-2 px-6 h-16 border-b border-border/40">
-        <PiggyBank className="h-6 w-6 text-primary animate-pulse" />
+      <div className="flex items-center gap-3 px-6 h-16 border-b border-border/40">
+        <img src="/logo-app-finanzas.png" alt="Logo" className="h-8 w-8 object-contain" />
         <span className="font-sans font-bold text-lg tracking-tight bg-gradient-to-r from-primary to-emerald-400 bg-clip-text text-transparent">
-          Antigravity Cash
+          Control de Gastos
         </span>
       </div>
 
@@ -104,23 +121,38 @@ export function Sidebar({ className, onItemClick }: SidebarProps) {
 
       {/* Bottom Footer Section */}
       <div className="p-4 border-t border-border/40 space-y-2">
-        <div className="flex items-center gap-3 px-4 py-2 rounded-xl text-xs text-muted-foreground bg-muted/20">
-          <div className="h-2 w-2 rounded-full bg-primary animate-ping" />
-          <span>Modo Demo Local</span>
-        </div>
-        
-        <button 
-          onClick={() => {
-            if (window.confirm("¿Estás seguro? Esto borrará toda tu base de datos local y te devolverá al Onboarding.")) {
-              localStorage.clear();
-              window.location.href = "/onboarding";
-            }
-          }}
-          className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
-        >
-          <LogOut className="h-4 w-4" />
-          Resetear Demo
-        </button>
+        {isLocal ? (
+          <>
+            <div className="flex items-center gap-3 px-4 py-2 rounded-xl text-xs text-muted-foreground bg-muted/20">
+              <div className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+              <span>Modo Demo Local</span>
+            </div>
+            
+            <button 
+              onClick={() => {
+                if (window.confirm("¿Estás seguro? Esto borrará toda tu base de datos local y te devolverá al Onboarding.")) {
+                  localStorage.clear();
+                  window.location.href = "/onboarding";
+                }
+              }}
+              className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+              Resetear Demo
+            </button>
+          </>
+        ) : (
+          <button 
+            onClick={async () => {
+              await provider.logout();
+              window.location.href = "/";
+            }}
+            className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            Cerrar sesión
+          </button>
+        )}
       </div>
     </div>
   );

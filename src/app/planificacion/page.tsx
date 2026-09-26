@@ -12,7 +12,8 @@ import {
   Wallet,
   Plus,
   CalendarDays,
-  Trash2
+  Trash2,
+  Loader2
 } from "lucide-react";
 import { useDataProvider } from "@/hooks/use-data-provider";
 import { Button } from "@/components/ui/button";
@@ -55,7 +56,8 @@ export default function PlanificacionPage() {
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
   const [fechaIngreso, setFechaIngreso] = useState("");
-  const [ingreso, setIngreso] = useState("0");
+  const [ingreso, setIngreso] = useState("");
+  const [ingresoError, setIngresoError] = useState("");
   const [cuentaId, setCuentaId] = useState("");
 
   const [distribucion, setDistribucion] = useState<Record<string, number>>({});
@@ -64,6 +66,8 @@ export default function PlanificacionPage() {
   const [openNuevoProp, setOpenNuevoProp] = useState(false);
   const [nuevoPropNombre, setNuevoPropNombre] = useState("");
   const [nuevoPropTipoCat, setNuevoPropTipoCat] = useState<TipoCategoriaProposito>("COMPROMISO");
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -115,8 +119,6 @@ export default function PlanificacionPage() {
       } else {
         setEsNuevoMes(true);
       }
-
-      setIngreso("17790.61");
     }
     load();
   }, [provider]);
@@ -136,11 +138,11 @@ export default function PlanificacionPage() {
     try {
       const nuevo = await provider.crearProposito({
         nombre: nuevoPropNombre,
-        patronEsperado: nuevoPropTipoCat === "COMPROMISO" ? "FIJO" : "VARIABLE",
+        patron_esperado: nuevoPropTipoCat === "COMPROMISO" ? "FIJO" : "VARIABLE",
         es_ahorro: nuevoPropTipoCat === "AHORRO",
         tipo_categoria: nuevoPropTipoCat,
         activa: true,
-        icono: nuevoPropTipoCat === "AHORRO" ? "TrendingUp" : nuevoPropTipoCat === "COMPROMISO" ? "CheckCircle" : "Wallet",
+        icono: nuevoPropTipoCat === "AHORRO" ? "📈" : nuevoPropTipoCat === "COMPROMISO" ? "📋" : "🛒",
         color: nuevoPropTipoCat === "AHORRO" ? "#8b5cf6" : nuevoPropTipoCat === "COMPROMISO" ? "#3b82f6" : "#f97316"
       });
       
@@ -179,10 +181,15 @@ export default function PlanificacionPage() {
 
   const handleNext = () => {
     if (step === 1) {
+      setIngresoError("");
+      if (totalIngreso <= 0) {
+        setIngresoError("Por favor ingresa un monto válido mayor a 0");
+        return;
+      }
       if (esNuevoMes) {
-        if (!fechaInicio || !fechaFin || totalIngreso <= 0 || !cuentaId) return;
+        if (!fechaInicio || !fechaFin || !cuentaId) return;
       } else {
-        if (totalIngreso <= 0 || !cuentaId) return;
+        if (!cuentaId) return;
       }
       
       if (Object.keys(distribucion).length === 0) {
@@ -203,24 +210,31 @@ export default function PlanificacionPage() {
   };
 
   const handleConfirm = async () => {
-    const distArray = Object.entries(distribucion)
-      .filter(([, monto]) => monto > 0)
-      .map(([proposito_id, monto]) => ({ proposito_id, monto }));
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const distArray = Object.entries(distribucion)
+        .filter(([, monto]) => monto > 0)
+        .map(([proposito_id, monto]) => ({ proposito_id, monto }));
 
-     console.log("PAYLOAD FRONTEND ANTES DE ENVIAR:", distArray);
+      console.log("PAYLOAD FRONTEND ANTES DE ENVIAR:", distArray);
 
-    await provider.planificar({
-      nombre: esNuevoMes ? nombrePlan : (planActivo?.nombre ?? "Plan Financiero"),
-      fecha_inicio: esNuevoMes ? fechaInicio : (planActivo?.fecha_inicio ?? ""),
-      fecha_fin: esNuevoMes ? fechaFin : (planActivo?.fecha_fin ?? ""),
-      fecha_ingreso: fechaIngreso,
-      ingreso_recibido: totalIngreso,
-      cuenta_id: cuentaId,
-      distribucion: distArray,
-      plan_id_existente: esNuevoMes ? undefined : planActivo?.id
-    });
+      await provider.planificar({
+        nombre: esNuevoMes ? nombrePlan : (planActivo?.nombre ?? "Plan Financiero"),
+        fecha_inicio: esNuevoMes ? fechaInicio : (planActivo?.fecha_inicio ?? ""),
+        fecha_fin: esNuevoMes ? fechaFin : (planActivo?.fecha_fin ?? ""),
+        fecha_ingreso: fechaIngreso,
+        ingreso_recibido: totalIngreso,
+        cuenta_id: cuentaId,
+        distribucion: distArray,
+        plan_id_existente: esNuevoMes ? undefined : planActivo?.id
+      });
 
-    router.push("/dashboard");
+      router.push("/dashboard");
+    } catch (error) {
+      console.error(error);
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -350,19 +364,26 @@ export default function PlanificacionPage() {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="ingreso">Monto del Ingreso (C$)</Label>
+                    <Label htmlFor="ingreso" className={ingresoError ? "text-rose-500" : ""}>
+                      Monto del Ingreso (C$)
+                    </Label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-emerald-500 font-bold">$</span>
+                      <span className={`absolute left-3 top-2.5 font-bold ${ingresoError ? "text-rose-500" : "text-emerald-500"}`}>C$</span>
                       <Input
                         id="ingreso"
                         type="number"
                         min="0"
                         step="0.01"
+                        placeholder="0.00"
                         value={ingreso}
-                        onChange={(e) => setIngreso(e.target.value)}
-                        className="pl-8 h-11 rounded-xl border-border/60 font-semibold text-lg text-emerald-500 focus-visible:ring-emerald-500/40 focus-visible:border-emerald-500 bg-emerald-500/5"
+                        onChange={(e) => {
+                          setIngreso(e.target.value);
+                          if (ingresoError) setIngresoError("");
+                        }}
+                        className={`pl-10 h-11 rounded-xl border-border/60 font-semibold text-lg ${ingresoError ? "border-rose-500 bg-rose-500/10 text-rose-500 focus-visible:ring-rose-500/40" : "text-emerald-500 focus-visible:ring-emerald-500/40 focus-visible:border-emerald-500 bg-emerald-500/5"}`}
                       />
                     </div>
+                    {ingresoError && <p className="text-sm text-rose-500 mt-1">{ingresoError}</p>}
                   </div>
                 </div>
 
@@ -410,7 +431,7 @@ export default function PlanificacionPage() {
                               )}
                             </p>
                             <span className="text-[10px] text-muted-foreground">
-                              {cat.patronEsperado}
+                              {cat.patron_esperado}
                             </span>
                           </div>
                         </div>
@@ -560,9 +581,22 @@ export default function PlanificacionPage() {
                 Continuar <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button onClick={handleConfirm} className="rounded-xl gap-2 bg-emerald-600 text-white hover:bg-emerald-700 font-bold px-6">
-                <CheckCircle2 className="h-4 w-4" /> ¡Guardar mi Plan!
-              </Button>
+              <div className="pt-6 flex justify-between">
+                <Button variant="outline" onClick={handleBack} disabled={isSubmitting} className="rounded-xl gap-2 border-border/60 hover:bg-muted/60">
+                  <ArrowLeft className="h-4 w-4" /> Atrás
+                </Button>
+                <Button onClick={handleConfirm} disabled={isSubmitting} className="rounded-xl gap-2 bg-emerald-600 text-white hover:bg-emerald-700 font-bold px-6">
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" /> ¡Guardar mi Plan!
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
         </Card>

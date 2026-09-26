@@ -417,6 +417,30 @@ export class LocalProvider implements DataProvider {
     return Promise.resolve();
   }
 
+  eliminarCuenta(id: string): Promise<void> {
+    const movimientos = this.getStore<Movimiento>("movimientos");
+    if (movimientos.some(m => m.cuenta_id === id)) {
+      throw new Error("No se puede eliminar la cuenta porque tiene movimientos asociados.");
+    }
+    const cuentas = this.getStore<Cuenta>("cuentas");
+    this.setStore("cuentas", cuentas.filter(c => c.id !== id));
+    return Promise.resolve();
+  }
+
+  eliminarProposito(id: string): Promise<void> {
+    const movimientos = this.getStore<Movimiento>("movimientos");
+    if (movimientos.some(m => m.proposito_id === id)) {
+      throw new Error("No se puede eliminar el propósito porque tiene gastos asociados.");
+    }
+    const asignaciones = this.getStore<Asignacion>("asignaciones");
+    if (asignaciones.some(a => a.proposito_id === id)) {
+      throw new Error("No se puede eliminar el propósito porque tiene dinero asignado en un plan.");
+    }
+    const propositos = this.getStore<Proposito>("propositos");
+    this.setStore("propositos", propositos.filter(p => p.id !== id));
+    return Promise.resolve();
+  }
+
   // Resumen / KPIs
   async getResumenKPIs(planId: string): Promise<ResumenKPIs> {
     const plan = this.getStore<PlanFinanciero>("planes").find(p => p.id === planId);
@@ -427,9 +451,9 @@ export class LocalProvider implements DataProvider {
     const movimientos = this.getStore<Movimiento>("movimientos");
     
     const ingresosDelPlan = movimientos.filter(m => m.tipo === "INGRESO" && m.plan_id === planId);
-    const ingreso_total = Math.round(ingresosDelPlan.reduce((sum, m) => sum + m.monto, 0) * 100) / 100;
+    let ingreso_total = Math.round(ingresosDelPlan.reduce((sum, m) => sum + m.monto, 0) * 100) / 100;
 
-    // Solo el dinero NUEVO asignado consume el ingreso de este plan
+    // El dinero asignado total es SOLAMENTE el nuevo dinero asignado (sin rollover) para que cuadre con el Ingreso Plan
     const total_asignado = Math.round(asignaciones.reduce((sum, a) => sum + a.monto_asignado, 0) * 100) / 100;
     
     const propositos = this.getStore<Proposito>("propositos");
@@ -443,9 +467,9 @@ export class LocalProvider implements DataProvider {
     // Gastos que salieron de sobres
     const gastosDelPlan = movimientos.filter(m => m.tipo === "GASTO" && m.asignacion_id && asigIds.includes(m.asignacion_id));
     
-    // Identificar cuánto de eso fue AHORRO
-    const ahorrosDelPlan = gastosDelPlan.filter(m => m.asignacion_id && asignacionesAhorroIds.includes(m.asignacion_id));
-    const total_ahorrado = Math.round(ahorrosDelPlan.reduce((sum, m) => sum + m.monto, 0) * 100) / 100;
+    // El ahorro total nuevo es solo el dinero NUEVO asignado a los propósitos de ahorro este mes
+    const asignacionesAhorro = asignaciones.filter(a => asignacionesAhorroIds.includes(a.id));
+    const total_ahorrado = Math.round(asignacionesAhorro.reduce((sum, a) => sum + a.monto_asignado, 0) * 100) / 100;
 
     // Resto de gastos en sobres
     const gastosSobresReales = gastosDelPlan.filter(m => !m.asignacion_id || !asignacionesAhorroIds.includes(m.asignacion_id));

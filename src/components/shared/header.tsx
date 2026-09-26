@@ -15,14 +15,18 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const { theme, toggle } = useTheme();
   const provider = useDataProvider();
   const [planActivo, setPlanActivo] = useState<PlanFinanciero | null>(null);
+  const [user, setUser] = useState<{ id: string; nombre: string } | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
         const active = await provider.getPlanActivo();
         setPlanActivo(active);
+        
+        const currentUser = await provider.getUser();
+        if (currentUser) setUser(currentUser);
       } catch (e) {
-        console.error("Error cargando plan activo en header", e);
+        console.error("Error cargando datos en header", e);
       }
     }
     load();
@@ -37,6 +41,19 @@ export function Header({ onMenuToggle }: HeaderProps) {
       month: "short",
     });
   };
+
+  const isLocal = user?.id === "local-user";
+  const nombreDisplay = user?.nombre || "App User";
+  
+  // Obtener iniciales ("Julio Rivera" -> "JR", "Julio" -> "JU")
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(" ");
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+  const initials = getInitials(nombreDisplay);
 
   return (
     <header className="h-16 px-4 md:px-6 flex items-center justify-between border-b border-border/45 bg-background/50 backdrop-blur-md sticky top-0 z-30">
@@ -91,11 +108,11 @@ export function Header({ onMenuToggle }: HeaderProps) {
         {/* User Info Capsule */}
         <div className="flex items-center gap-2 pl-2 border-l border-border/40">
           <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/45">
-            <span className="text-xs font-bold text-emerald-500">JD</span>
+            <span className="text-xs font-bold text-emerald-500">{initials}</span>
           </div>
           <div className="hidden md:block text-left">
-            <p className="text-xs font-semibold">Julio Demo</p>
-            <p className="text-[10px] text-muted-foreground">App User</p>
+            <p className="text-xs font-semibold">{nombreDisplay}</p>
+            <p className="text-[10px] text-muted-foreground">{isLocal ? "Modo Local" : "Cuenta Cloud"}</p>
           </div>
         </div>
       </div>
