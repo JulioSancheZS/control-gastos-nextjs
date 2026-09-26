@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Control de Gastos - Personal Finance App 💰
 
-## Getting Started
+Una aplicación web integral de finanzas personales diseñada bajo la estricta filosofía de **Presupuesto Base Cero (Zero-Based Budgeting)**. Permite a los usuarios tener un control absoluto de su dinero, asignando cada centavo a propósitos específicos (sobres) antes de gastarlo.
 
-First, run the development server:
+## 🚀 Funcionalidades Principales
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Presupuesto Base Cero (Asistente Quincenal/Mensual):** Flujo paso a paso para repartir los ingresos en sobres hasta llegar a cero.
+- **Gestión de Sobres:**
+  - *Compromisos:* Servicios recurrentes y obligaciones fijas.
+  - *Fondos de Consumo:* Gastos variables del día a día (Súper, Gasolina, etc.).
+  - *Ahorros:* Dinero protegido a largo plazo con barras de progreso de metas.
+- **Transacciones Recurrentes:** Sistema automatizado de intercepción en el Dashboard que alerta y permite procesar cobros automáticos pendientes con un clic.
+- **Reportes Visuales:** Gráficas interactivas con el desglose de ingresos y egresos, e histórico semestral.
+- **Multi-Usuario Seguro:** Sistema de autenticación con aislamiento total de base de datos a nivel de filas (RLS).
+- **Onboarding Inteligente:** Al crear un perfil, se pre-cargan cuentas y sobres por defecto para facilitar el arranque.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Stack Tecnológico
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Frontend:** Next.js 14+ (App Router), React 18, TypeScript, Tailwind CSS.
+- **UI Components:** shadcn/ui, Radix UI, Recharts, Lucide Icons.
+- **Backend & Base de Datos:** Supabase (BaaS), PostgreSQL, Row Level Security (RLS).
+- **Hosting:** Vercel.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## ⚙️ Instalación y Configuración Local
 
-## Learn More
+1. **Clonar el repositorio**
+   ```bash
+   git clone https://github.com/tu-usuario/nombre-del-repo.git
+   cd nombre-del-repo
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+2. **Instalar dependencias**
+   ```bash
+   npm install
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. **Variables de Entorno**
+   Crea un archivo llamado `.env.local` en la raíz del proyecto basándote en el archivo de ejemplo:
+   ```bash
+   cp .env.example .env.local
+   ```
+   Rellena `.env.local` con tus llaves reales de Supabase:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=ey...
+   ```
+   *(Nota: Jamás debes commitear tus llaves reales. El archivo `.env.local` ya está excluido en el `.gitignore`)*.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. **Arrancar en Entorno de Desarrollo**
+   ```bash
+   npm run dev
+   ```
+   Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
 
-## Deploy on Vercel
+## 📝 Base de Datos (Supabase)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Para replicar el esquema de base de datos necesario, puedes utilizar el editor SQL de tu panel de Supabase. Deberás crear tablas como:
+- `perfiles_usuario`
+- `cuentas`
+- `propositos`
+- `planes_financieros`
+- `asignaciones`
+- `movimientos`
+- `transacciones_recurrentes`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Asegúrate de habilitar **Row Level Security (RLS)** en todas ellas para garantizar que cada usuario vea únicamente su propia información.
