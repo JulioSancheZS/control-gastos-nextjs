@@ -84,7 +84,7 @@ export default function OnboardingPage() {
       }
 
       // 3. Crear Propósitos por Defecto si no existen
-      if (tipo_perfil === "PLANIFICADOR" || tipo_perfil === "AHORRADOR") {
+      if (tipo_perfil === "PLANIFICADOR") {
         const propositos = await provider.getPropositos();
         if (propositos.length === 0) {
           for (const p of PROPOSITOS_DEFAULT) {
@@ -105,7 +105,7 @@ export default function OnboardingPage() {
       if (tipo_perfil === "TRACKER") {
         router.push("/dashboard");
       } else {
-        // Planificador and Ahorrador go to create their first plan
+        // Planificador va a crear su primer plan
         router.push("/planificacion");
       }
     } catch (e) {
@@ -181,7 +181,7 @@ export default function OnboardingPage() {
           <p className="text-sm font-medium pt-4">¿Cómo prefieres manejar tu dinero?</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto gap-6 pt-4">
           
           {/* Tracker */}
           <Card className="relative overflow-hidden group hover:border-blue-500/50 transition-colors cursor-pointer bg-card/40 backdrop-blur-sm border-white/10" onClick={() => handleSelectProfile("TRACKER")}>
@@ -226,28 +226,6 @@ export default function OnboardingPage() {
               </ul>
               <Button disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
                 Comenzar como Planificador
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Ahorrador */}
-          <Card className="relative overflow-hidden group hover:border-purple-500/50 transition-colors cursor-pointer bg-card/40 backdrop-blur-sm border-white/10" onClick={() => handleSelectProfile("AHORRADOR")}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl text-purple-400">
-                <span className="text-2xl">💰</span> El Ahorrador
-              </CardTitle>
-              <CardDescription className="text-base pt-2">
-                "Mi prioridad es separar mis ahorros y pagar deudas, el resto es para vivir."
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="text-sm space-y-2 text-muted-foreground mb-6">
-                <li>• Págate a ti mismo primero</li>
-                <li>• Seguimiento de metas</li>
-                <li>• Distribución automática (50/30/20)</li>
-              </ul>
-              <Button disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 text-white">
-                Comenzar como Ahorrador
               </Button>
             </CardContent>
           </Card>
