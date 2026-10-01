@@ -101,6 +101,9 @@ export default function OnboardingPage() {
         }
       }
 
+      // 3. Registrar Log
+      await provider.guardarLog("ONBOARDING_COMPLETADO", { tipo_perfil });
+
       // 4. Routing basado en perfil
       if (tipo_perfil === "TRACKER") {
         router.push("/dashboard");

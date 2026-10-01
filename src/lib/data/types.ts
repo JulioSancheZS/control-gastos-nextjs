@@ -98,4 +98,7 @@ export interface DataProvider {
   // Reportes
   getReporteCategorias(mesesAtras?: number): Promise<ReporteCategoria[]>;
   getReporteEvolucion(meses?: number): Promise<ReporteEvolucion[]>;
+
+  // Logs
+  guardarLog(accion: string, detalle?: Record<string, any>): Promise<void>;
 }

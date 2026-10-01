@@ -114,3 +114,11 @@ export interface TransaccionRecurrente {
   ultima_ejecucion?: string;
   created_at: string;
 }
+
+export interface RegistroLog {
+  id: string;
+  user_id: string;
+  accion: string;
+  detalle?: Record<string, any>;
+  created_at: string;
+}

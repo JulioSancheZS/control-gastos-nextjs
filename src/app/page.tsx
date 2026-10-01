@@ -14,7 +14,9 @@ export default function Home() {
   useEffect(() => {
     async function checkProfile() {
       try {
+        const user = await provider.getUser();
         const perfil = await provider.getPerfil();
+        
         if (perfil) {
           const planActivo = await provider.getPlanActivo();
           if (planActivo) {
@@ -22,8 +24,11 @@ export default function Home() {
           } else {
             router.push("/planificacion");
           }
+        } else if (user) {
+          // Si está autenticado pero aún no ha creado el perfil en la base de datos (Ej: Recién hace click en el Magic Link)
+          router.push("/onboarding");
         } else {
-          // Si no hay perfil activo (sesión cerrada), verificamos si ya se había registrado antes
+          // Si no hay perfil activo ni usuario (sesión cerrada)
           if (typeof window !== "undefined" && window.localStorage.getItem("hasRegistered") === "true") {
             router.push("/auth/login");
           } else {

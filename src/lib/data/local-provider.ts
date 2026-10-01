@@ -525,4 +525,9 @@ export class LocalProvider implements DataProvider {
   // --- Reportes ---
   async getReporteCategorias(): Promise<any> { return []; }
   async getReporteEvolucion(): Promise<any> { return []; }
+
+  // --- Logs ---
+  async guardarLog(accion: string, detalle?: Record<string, any>): Promise<void> {
+    console.log(`[LOG LOCAL] ${accion}`, detalle);
+  }
 }

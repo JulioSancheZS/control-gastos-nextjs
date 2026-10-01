@@ -594,4 +594,20 @@ export class SupabaseProvider implements DataProvider {
     const { error } = await supabase.from('transacciones_recurrentes').update({ ultima_ejecucion: fecha }).eq('id', id);
     if (error) throw new Error(error.message);
   }
+
+  // --- Logs ---
+  async guardarLog(accion: string, detalle?: Record<string, any>): Promise<void> {
+    try {
+      const user = await this.getUser();
+      if (!user) return; // No hacemos crash si falla el log
+      
+      await supabase.from('registro_logs').insert([{
+        user_id: user.id,
+        accion: accion,
+        detalle: detalle || {}
+      }]);
+    } catch (e) {
+      console.error("Error guardando log", e);
+    }
+  }
 }
