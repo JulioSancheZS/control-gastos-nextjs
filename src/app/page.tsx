@@ -97,6 +97,7 @@ export default function Home() {
             <ArrowRight className="ml-auto h-5 w-5 group-hover:translate-x-1 transition-transform" />
           </Button>
 
+          {/* 
           <Button 
             variant="outline"
             onClick={() => router.push("/onboarding")}
@@ -105,6 +106,7 @@ export default function Home() {
             <Smartphone className="mr-2 h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
             Empezar (Modo de prueba)
           </Button>
+          */}
         </div>
 
         <div className="mt-8 text-center text-sm text-muted-foreground">
